@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: rio-node-codepipeline-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: 'sts:AssumeRole'
+#          - Effect: Allow
+#            Action:
+#              - sts:AssumeRole
+#            Principal:
+#              AWS:
+#                - arn:aws:iam::061416964074:role/rio-node-codepipeline-role
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeCommitFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
+        - arn:aws:iam::aws:policy/AWSCodeDeployFullAccess
+#        - arn:aws:iam::061416964074:policy/preprod-artifact-access-policy
+      Policies:
+        - PolicyName: RioNodeDeployPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - logs:*
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                  - ec2:CreateNetworkInterfacePermission
+                  - codecommit:GitPull
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParameterByPath
+                  - cloudformation:*
+                  - s3:*
+                  - iam:*
+                  - lambda:*
+                  - acm:*
+                  - route53:*
+                  - apigateway:*
+                  - waf:*
+                  - dynamodb:*
+                  - kinesisanalytics:*
+                  - kinesis:*
+                  - events:*
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetAuthorizationToken
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                  - ecs:*
+                  - application-autoscaling:*
+                  - elasticloadbalancing:*
+                  - cloudwatch:*
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Resource: '*'

@@ -1,0 +1,55 @@
+[package]
+name = "rio-payment"
+version = "0.1.0"
+authors = ["Rio Team<dev@riodefi.com>"]
+edition = "2018"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "2.2.0", features = ["derive"], default-features = false }
+serde = { version = "1.0", optional = true }
+scale-info = { version = "1.0", features = ["derive"], default-features = false }
+
+# substrate
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false}
+
+# substrate runtime module
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+
+# rio
+rio-primitives = { path = "../../primitives", default-features = false }
+rio-support = { path = "../support", default-features = false }
+
+[dev-dependencies]
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12" }
+sp-storage = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12" }
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12" }
+smallvec = "1.4.0"
+
+orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library.git", rev = "ee37b76a7a8cf159e6c41851942758746318bb84", default-features = false }
+
+rio-assets = { path = "../assets" }
+rio-protocol = { path = "../protocol" }
+rio-payment-fee = { path = "./fee" }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "serde",
+    "scale-info/std",
+
+    "sp-std/std",
+    "sp-runtime/std",
+    "sp-io/std",
+
+    "frame-support/std",
+    "frame-system/std",
+    "pallet-transaction-payment-rpc-runtime-api/std",
+
+    "rio-primitives/std",
+    "rio-support/std",
+]

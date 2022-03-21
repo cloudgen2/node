@@ -1,0 +1,19 @@
+[package]
+name = "rio-gateway-rpc"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "2.2.0", features = ["derive"], default-features = false }
+serde = { version = "1.0.101", features = ["derive"] }
+jsonrpc-core = { version = "15.0.0", features = ["arbitrary_precision"] }
+jsonrpc-core-client = { version = "15.0.0", features = ["arbitrary_precision"] }
+jsonrpc-derive = "15.0.0"
+hex = "0.4"
+scale-info = { version = "1.0", features = ["derive"], default-features = false }
+
+sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-blockchain = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+
+rio-gateway-rpc-runtime-api = { path = "runtime-api" }

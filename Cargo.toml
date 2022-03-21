@@ -1,0 +1,29 @@
+[workspace]
+members = [
+    "bin/collator",
+    "runtime/local",
+#    "runtime/astar",
+#    "runtime/shiden",
+#    "runtime/shibuya",
+#    "frame/block-reward",
+#    "frame/dapps-staking",
+#    "precompiles/staking",
+    "frame/custom-signatures",
+#    "frame/substrate-validator-set",
+    "riodefi/rio/support",
+    "riodefi/rio/protocol",
+    "riodefi/rio/assets",
+    "riodefi/rio/assets-ext",
+    "riodefi/rio/gateway",
+    "riodefi/rio/root",
+    "riodefi/rio/prices",
+    "proc-macro",
+]
+
+exclude = [
+    "vendor"
+]
+
+[profile.release]
+# Astar runtime requires unwinding.
+panic = "unwind"

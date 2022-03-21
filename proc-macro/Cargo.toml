@@ -1,0 +1,15 @@
+[package]
+name = "rio-proc-macro"
+version = "0.1.0"
+authors = ["Zhukov Evgeni <zhukov@riodefi.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version="1.0.74",features=["full","visit","visit-mut","parsing"]}
+proc-macro2 = {version="1.0.26"}
+quote = "1.0.9"
+frame-support-procedural = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+regex = "1.5.4"

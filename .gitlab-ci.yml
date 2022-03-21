@@ -1,0 +1,44 @@
+variables:
+  BUILD_TARGET: rio-node-build
+  RUNNER_TARGET: rio-node-runner
+  CICD_TARGET: rio-node-cicd
+  PUBLIC_REGISTRY: public.ecr.aws/e6s7r2u6/rio-node-public
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+
+stages:
+  - dev-node
+
+dev-node:
+  stage: dev-node
+  timeout: 2 hours
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  services:
+    - docker:dind
+  before_script:
+    - amazon-linux-extras install docker
+  script:
+    - echo "Authentificating in AWS ECR [$PUBLIC_REGISTRY]"
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin $PUBLIC_REGISTRY
+
+    - echo "Started Rio Node build..."
+    - if [[ "$(docker images -q $BUILD_TARGET 2> /dev/null)" == "" ]]; then docker build -t $BUILD_TARGET .; else echo "Using existing build"; fi
+
+    - echo "Started intermediate image build..."
+    - docker build -t $CICD_TARGET -f ./docker/cicd.Dockerfile --build-arg FROM_IMAGE=$BUILD_TARGET .
+
+    - echo "Building runner..."
+    - docker build -t $RUNNER_TARGET -f ./docker/runner.Dockerfile --build-arg FROM_IMAGE=$CICD_TARGET .
+    - docker tag $RUNNER_TARGET $PUBLIC_REGISTRY:$CI_JOB_ID
+
+    - echo "Pushing runner..."
+    - docker push $PUBLIC_REGISTRY:$CI_JOB_ID
+  after_script:
+    - docker rmi $CICD_TARGET
+    - docker rmi $RUNNER_TARGET
+    #- docker rmi $BUILD_TARGET
+    - echo "To run the node locally use"
+    - echo "docker run --rm -p 80:80 $PUBLIC_REGISTRY:$CI_JOB_ID"
+  except:
+    - develop

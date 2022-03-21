@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_NAME: rio-node
+
+phases:
+  pre_build:
+    commands:
+      - export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
+      - export AWS_ACCOUNT_ID=$(echo $CODEBUILD_BUILD_ARN | awk -F":" '{print $5}')
+      - export ECR_REPO=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_NAME
+      - $(aws ecr get-login --no-include-email)
+  build:
+    commands:
+      - echo Build started on `date`
+      - docker build -t $IMAGE_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_NAME:$IMAGE_TAG $ECR_REPO:$IMAGE_TAG
+      - docker push $ECR_REPO:$IMAGE_TAG
+      - printf '{"ImageURI":"%s:%s"}' $ECR_REPO $IMAGE_TAG > imageDetails.json
+  post_build:
+    commands:
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - imageDetails.json
+
+cache:
+  paths:
+    - '/nix'
+    - '/tmp'

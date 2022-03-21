@@ -1,0 +1,28 @@
+[package]
+name = "rio-gateway-rpc-runtime-api"
+version = "0.1.0"
+authors = ["Rio Team<dev@riodefi.com>"]
+edition = "2018"
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "2.2.0", features = ["derive"], default-features = false }
+scale-info = { version = "1.0", features = ["derive"], default-features = false }
+
+sp-api = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+
+rio-gateway = { path = "../../", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+
+    "sp-api/std",
+    "sp-std/std",
+    "sp-runtime/std",
+
+    "rio-gateway/std",
+]

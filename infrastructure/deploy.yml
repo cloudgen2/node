@@ -1,0 +1,377 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy a service on AWS Fargate using ECS task sets, hosted in a public subnet, and accessible via a public load balancer.
+
+Parameters:
+  Vpc:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  PublicSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  SecurityGroups:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  ImageURI:
+    Type: String
+  Stage:
+    Type: String
+    Default: dev
+  AppName:
+    Type: String
+    Default: rio-node
+  HostedZone:
+    Type: String
+    Default: node.riocorenetwork.com
+  DesiredCount:
+    Type: String
+    Default: 1
+
+Resources:
+  # ECS resources
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: "1024"
+      ExecutionRoleArn: !GetAtt ServiceTaskExecutionRole.Arn
+      Family: !Sub ${AppName}-${Stage}
+      Memory: "2048"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ServiceTaskRole.Arn
+      ContainerDefinitions:
+        - Name: !Sub ${AppName}-${Stage}-app
+          Essential: true
+          Image: !Sub "${ImageURI}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ServiceLogGroup
+              awslogs-stream-prefix: !Sub ${AppName}-${Stage}
+              awslogs-region: !Ref "AWS::Region"
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: tcp
+          # todo - chain-spec location
+          #Secrets:
+          #  - Name: NEW_RELIC_LICENSE_KEY
+          Environment:
+            - Name: STAGE
+              Value: !Sub ${Stage}
+            - Name: PORT
+              Value: 80
+            - Name: LOG_LEVEL
+              Value: info
+            - Name: NODE_OPTIONS
+              Value: --tls-min-v1.0
+            - Name: NEW_RELIC_APP_NAME
+              Value: !Sub ${AppName}-${Stage}
+            - Name: NEW_RELIC_NO_CONFIG_FILE
+              Value: true
+            - Name: NEW_RELIC_ACCOUNT_ID
+              Value: 1526825
+            - Name: NEW_RELIC_TRUSTED_ACCOUNT_KEY
+              Value: 1526825
+
+        - Name: !Sub ${AppName}-${Stage}-newrelic-infra
+          Essential: true
+          Image: newrelic/infrastructure-bundle:2.1.2
+          Cpu: 256
+          MemoryReservation: 512
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref NewRelicLogGroup
+              awslogs-stream-prefix: !Sub ${AppName}-${Stage}
+              awslogs-region: !Ref "AWS::Region"
+          Environment:
+            - Name: NRIA_OVERRIDE_HOST_ROOT
+              Value: ""
+            - Name: NRIA_IS_FORWARD_ONLY
+              Value: true
+            - Name: FARGATE
+              Value: true
+            - Name: ENABLE_NRI_ECS
+              Value: true
+            - Name: NRIA_PASSTHROUGH_ENVIRONMENT
+              Value: "ECS_CONTAINER_METADATA_URI,ENABLE_NRI_ECS,FARGATE"
+            - Name: NRIA_CUSTOM_ATTRIBUTES
+              Value: "{\"nrDeployMethod\":\"downloadPage\"}"
+          Secrets:
+            - Name: NRIA_LICENSE_KEY
+              ValueFrom: !Sub "newrelic-license-key"
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-${Stage}
+        - Key: SERVICEID
+          Value: ts01076
+        - Key: ENVIRONMENT
+          Value: !Ref Stage
+
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${AppName}-${Stage}-service
+      Cluster: rio-node-cluster
+      DesiredCount: !Ref DesiredCount
+      DeploymentController:
+        Type: EXTERNAL
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-${Stage}-service
+        - Key: SERVICEID
+          Value: ts01076
+        - Key: ENVIRONMENT
+          Value: !Ref Stage
+    DependsOn:
+      - ServiceTargetGroup
+      - HTTPSListener
+
+  TaskSet:
+    Type: AWS::ECS::TaskSet
+    Properties:
+      Cluster: rio-node-cluster
+      Service: !Ref Service
+      Scale:
+        Unit: PERCENT
+        Value: 100
+      TaskDefinition: !Ref TaskDefinition
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: !Sub ${AppName}-${Stage}-app
+          ContainerPort: 80
+          TargetGroupArn: !Ref ServiceTargetGroup
+      NetworkConfiguration:
+        AwsVpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: !Ref SecurityGroups
+          Subnets: !Ref PrivateSubnets
+
+  PrimaryTaskSet:
+    Type: AWS::ECS::PrimaryTaskSet
+    Properties:
+      Cluster: rio-node-cluster
+      Service: !Ref Service
+      TaskSetId: !GetAtt TaskSet.Id
+
+  # Logs resources
+  ServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/ecs/${AppName}-${Stage}-app
+
+  NewRelicLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/ecs/${AppName}-${Stage}-newrelic-infra
+
+  # Load balancer resources
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${AppName}-${Stage}-lb
+      Scheme: internet-facing # internet-facing || internal
+      SecurityGroups: !Ref SecurityGroups
+      Subnets: !Ref PublicSubnets # PublicSubnets for internet-facing || PrivateSubnets for internal
+      Type: application
+
+  ServiceTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AppName}-${Stage}-tg
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 30
+      TargetGroupAttributes:
+        - Key: 'deregistration_delay.timeout_seconds'
+          Value: 300
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref Vpc
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Certificates:
+        - CertificateArn: !Ref DomainCertificate
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: ServiceTargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+
+  DomainCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub ${AppName}-${Stage}.${HostedZone}
+      DomainValidationOptions:
+        - DomainName: !Sub ${AppName}-${Stage}.${HostedZone}
+          ValidationDomain: !Sub ${AppName}-${Stage}.${HostedZone}
+      ValidationMethod: DNS
+
+  # Manual step:
+  # to create record navigate to
+  # AWS Certificate Manager > Certificates > [record_guid]
+  # and press "Create Records in Route 53"
+  Route53:
+    Type: AWS::Route53::RecordSet
+    DependsOn: LoadBalancer
+    Properties:
+      Comment: 'Manual approval required on first deployment in region'
+      HostedZoneName: !Sub ${HostedZone}.
+      Name: !Sub ${AppName}-${Stage}.${HostedZone}
+      Type: CNAME
+      TTL: '60'
+      ResourceRecords:
+        - !GetAtt LoadBalancer.DNSName
+
+  # Application AutoScaling
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: TaskSet
+    Properties:
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/rio-node-cluster/${AppName}-${Stage}-service
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: !Ref DesiredCount
+      MaxCapacity: 8
+
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${AppName}-${Stage}-service-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 75.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AppName}-${Stage}-service-auto-scaling-role
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+      Policies:
+        - PolicyName: !Sub ${AppName}-${Stage}-service-auto-scaling-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:DeleteAlarms
+                Resource:
+                  - "*"
+
+  # Alarms
+  # Alarm on unhealthy hosts and HTTP 500s at the target group level
+  UnhealthyHostsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-UnhealthyHosts
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 2
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt ServiceTargetGroup.TargetGroupFullName
+        - Name: LoadBalancer
+          Value: !GetAtt LoadBalancer.LoadBalancerFullName
+      MetricName: UnHealthyHostCount
+      Namespace: AWS/ApplicationELB
+      Period: 300
+      Statistic: Average
+      Threshold: 2
+
+  Http5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${AWS::StackName}-Http5xx
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt ServiceTargetGroup.TargetGroupFullName
+        - Name: LoadBalancer
+          Value: !GetAtt LoadBalancer.LoadBalancerFullName
+      MetricName: HTTPCode_Target_5XX_Count
+      Namespace: AWS/ApplicationELB
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+
+  ServiceTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AppName}-${Stage}-task-role
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: "2012-10-17"
+
+  ServiceTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AppName}-${Stage}-execution-role
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: "2012-10-17"
+      Policies:
+        - PolicyName: !Sub ${AppName}-${Stage}-execution-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Effect: Allow
+                Resource: !Sub arn:aws:ecr:us-east-1:061416964074:repository/rio-node
+              - Action: ecr:GetAuthorizationToken
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Effect: Allow
+                Resource:
+                  - !GetAtt ServiceLogGroup.Arn
+                  - !GetAtt NewRelicLogGroup.Arn
+              - Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - secretsmanager:GetSecretValue
+                  - kms:Decrypt
+                Effect: Allow
+                Resource: "*"
+
+Outputs:
+  ServiceURL:
+    Value: !Join
+      - ""
+      - - http://
+        - !GetAtt LoadBalancer.DNSName

@@ -1,0 +1,26 @@
+version: '3.7'
+
+services:
+
+  rio-node:
+    image: rio-node
+    #depends_on:
+    #  - build
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - build=skip
+    #environment:
+    #  - RUST_LOG=debug
+    volumes:
+      - nix:/nix
+      - tmp:/tmp
+      - target:/home/ubuntu/src/target
+    entrypoint: sh -c '~/src/docker/scripts/build.sh && ~/src/docker/scripts/run.sh'
+
+volumes:
+  nix:
+  tmp:
+  target:
+

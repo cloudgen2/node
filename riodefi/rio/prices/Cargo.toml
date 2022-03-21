@@ -1,0 +1,46 @@
+[package]
+name = "rio-prices"
+version = "0.1.0"
+authors = ["Rio Defi Team<dev@riodefi.com>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.126", optional = true }
+codec = { package = "parity-scale-codec", version = "2.2.0", default-features = false }
+scale-info = { version = "1.0", features = ["derive"], default-features = false }
+
+sp-runtime = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-std = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+frame-support = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+frame-system = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+
+orml-traits = { git = "https://github.com/open-web3-stack/open-runtime-module-library.git", rev = "ee37b76a7a8cf159e6c41851942758746318bb84", default-features = false }
+orml-oracle = { git = "https://github.com/open-web3-stack/open-runtime-module-library.git", rev = "ee37b76a7a8cf159e6c41851942758746318bb84", default-features = false }
+orml-utilities = { git = "https://github.com/open-web3-stack/open-runtime-module-library.git", rev = "ee37b76a7a8cf159e6c41851942758746318bb84", default-features = false }
+
+rio-support = { path = "../support", default-features = false }
+rio-primitives = { path = "../../primitives", default-features = false }
+
+[dev-dependencies]
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+sp-io = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.12", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+	"serde",
+	"codec/std",
+	"scale-info/std",
+
+	"sp-runtime/std",
+	"sp-std/std",
+	"frame-support/std",
+	"frame-system/std",
+
+	"orml-oracle/std",
+	"orml-traits/std",
+	"orml-utilities/std",
+
+	"rio-support/std",
+	"rio-primitives/std",
+]

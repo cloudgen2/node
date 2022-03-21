@@ -1,0 +1,15 @@
+# this file should be deployed separately to each region
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  ECSCluster:
+    Type: 'AWS::ECS::Cluster'
+    Properties:
+      ClusterName: rio-node-cluster
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      Tags:
+        - Key: Name
+          Value: rio-node-cluster
